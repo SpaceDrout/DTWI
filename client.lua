@@ -16,7 +16,7 @@ Citizen.CreateThread(function()
         timeOfDay = GetClockHours()
         
         if timeOfDay >= 7 and timeOfDay <= 9 or timeOfDay >= 16 and timeOfDay <= 18 then
-            trafficDensity = 0.10 -- Rush hour traffic is higher
+            trafficDensity = 0.8 -- Rush hour traffic is higher
         else
             trafficDensity = 0.5 -- Regular traffic density
         end
@@ -62,7 +62,7 @@ function AdjustTraffic(density)
     -- Traffic jam simulation during rush hours
     if density > 0.7 then
         -- Increase vehicle spawning in dense areas to simulate a traffic jam
-        local players = GetPlayers()
+        local players = GetActivePlayers()  -- Corrected function to get active players
         for _, player in pairs(players) do
             local playerPed = GetPlayerPed(player)
             local playerPos = GetEntityCoords(playerPed)
@@ -78,7 +78,7 @@ function AdjustTraffic(density)
         end
     else
         -- Reset vehicles to normal speeds during non-rush hour
-        local players = GetPlayers()
+        local players = GetActivePlayers()  -- Corrected function to get active players
         for _, player in pairs(players) do
             local playerPed = GetPlayerPed(player)
             local playerPos = GetEntityCoords(playerPed)
@@ -92,16 +92,24 @@ function AdjustTraffic(density)
 end
 
 function ModifyVehicleHandlingForRain(enable)
-    -- Modifies handling for wet roads
-    local handlingType = enable and 0.5 or 1.0
-    SetVehicleHandlingField("wet_braking", handlingType) -- Adjust wet braking for rain
-    SetVehicleHandlingField("traction_loss", handlingType) -- Adjust traction for rain
+    -- Modifies handling for wet roads using SetVehicleHandlingField
+    local handlingType = enable and 0.6 or 1.0
+    local vehicle = GetVehiclePedIsIn(PlayerPedId(), false)
+    if vehicle then
+        -- Adjust traction for wet roads (wet braking and traction loss)
+        SetVehicleHandlingField(vehicle, "fWetBrakes", handlingType)  -- Wet brake handling
+        SetVehicleHandlingField(vehicle, "fTractionLoss", handlingType)  -- Traction loss
+    end
 end
 
 function ModifyVehicleHandlingForSnow(enable)
-    -- Modifies handling for snow
+    -- Modifies handling for snow using SetVehicleHandlingField
     local handlingType = enable and 0.7 or 1.0
-    SetVehicleHandlingField("traction_loss", handlingType) -- Adjust traction for snow
+    local vehicle = GetVehiclePedIsIn(PlayerPedId(), false)
+    if vehicle then
+        -- Adjust traction for snow (higher traction loss in snow)
+        SetVehicleHandlingField(vehicle, "fTractionLoss", handlingType)  -- Traction loss
+    end
 end
 
 function GetNearbyVehicles(position, radius)
