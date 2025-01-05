@@ -1,11 +1,3 @@
--- Config for road types and base speed limits
-local roadConfig = {
-    highway = 65,  -- Base speed limit for highways (65 mph)
-    city = 40,     -- Base speed limit for city streets (40 mph)
-    rural = 50,    -- Base speed limit for rural roads (50 mph)
-    default = 45   -- Default speed limit if no road type is found (45 mph)
-}
-
 local isRaining = false
 local isSnowing = false
 local isFoggy = false
@@ -49,9 +41,11 @@ Citizen.CreateThread(function()
         if isRaining then
             -- Modify NPC handling for wet roads
             ModifyNPCVehicleHandlingForRain(true)
+            ModifyPlayerVehicleHandlingForRain(true)
         elseif isSnowing then
             -- Modify NPC handling for snow
             ModifyNPCVehicleHandlingForSnow(true)
+            ModifyPlayerVehicleHandlingForSnow(true)
         elseif isFoggy then
             -- Reduce visibility effects (you can add fog behavior here)
             SetVehicleHandlingField("visibility", 0.5)
@@ -59,6 +53,8 @@ Citizen.CreateThread(function()
             -- Reset normal conditions
             ModifyNPCVehicleHandlingForRain(false)
             ModifyNPCVehicleHandlingForSnow(false)
+            ModifyPlayerVehicleHandlingForRain(false)
+            ModifyPlayerVehicleHandlingForSnow(false)
         end
 
         -- Adjust traffic spawn rate and behavior based on density
@@ -80,8 +76,9 @@ function AdjustTraffic(density)
             for _, car in ipairs(nearbyCars) do
                 -- Apply weather effects only to NPCs, not the player's vehicle
                 if car ~= GetVehiclePedIsIn(PlayerPedId(), false) then  -- Skip player's vehicle
-                    -- Adjust NPC speed based on road type and weather conditions
-                    AdjustNPCSpeed(car, playerPos)
+                    -- Adjust NPC speed and handling based on weather conditions
+                    AdjustNPCSpeed(car)
+                    ModifyNPCVehicleHandlingForRain(true)
                 end
             end
         end
@@ -98,23 +95,19 @@ function AdjustTraffic(density)
                 if car ~= GetVehiclePedIsIn(PlayerPedId(), false) then
                     SetEntityMaxSpeed(car, 45.0)  -- Set NPC speed to 45 mph
                     -- NPCs move normally in better conditions
-                    AdjustNPCSpeed(car, playerPos)
+                    AdjustNPCSpeed(car)
                 end
             end
         end
     end
 end
 
-function AdjustNPCSpeed(car, playerPos)
+function AdjustNPCSpeed(car)
     -- Adjust the NPC vehicle driving behavior based on the weather or traffic conditions
     local currentSpeed = GetEntitySpeed(car)
-    
-    -- Get road type based on the player’s current location
-    local roadType = GetRoadType(playerPos)
-    local baseSpeed = roadConfig[roadType] or roadConfig.default  -- Default speed if road type not found
+    local targetSpeed = 45.0  -- Default speed limit (normal condition)
 
     -- Apply speed reduction based on weather conditions
-    local targetSpeed = baseSpeed
     if isRaining then
         targetSpeed = targetSpeed - math.random(10, 15)  -- Reduce by 10-15 mph in rain
     elseif isSnowing then
@@ -124,20 +117,6 @@ function AdjustNPCSpeed(car, playerPos)
     -- Limit the NPC speed to the target speed
     if currentSpeed > targetSpeed then
         SetEntityMaxSpeed(car, targetSpeed)  -- Apply the target max speed
-    end
-end
-
-function GetRoadType(position)
-    -- Logic to determine the road type based on player position (simplified)
-    -- In a real case, you might want to use predefined areas or road zones to determine this
-
-    -- Placeholder logic: assuming highways are in the upper part of the map, and city streets are everywhere else
-    if position.x > 2000 then
-        return "highway"  -- If player is on a highway area
-    elseif position.x > 1000 then
-        return "city"  -- If player is on city streets
-    else
-        return "rural"  -- Default to rural roads
     end
 end
 
@@ -171,6 +150,25 @@ function ModifyNPCVehicleHandlingForSnow(enable)
         -- Adjust traction for snow (higher traction loss in snow)
         SetVehicleHandlingField(vehicle, "fTractionLoss", handlingType)  -- Traction loss
         ::continue::
+    end
+end
+
+function ModifyPlayerVehicleHandlingForRain(enable)
+    -- Apply traction loss and braking adjustments to the player's vehicle during rain
+    local vehicle = GetVehiclePedIsIn(PlayerPedId(), false)
+    if vehicle then
+        local handlingType = enable and 0.6 or 1.0
+        SetVehicleHandlingField(vehicle, "fWetBrakes", handlingType)  -- Wet brake handling
+        SetVehicleHandlingField(vehicle, "fTractionLoss", handlingType)  -- Traction loss
+    end
+end
+
+function ModifyPlayerVehicleHandlingForSnow(enable)
+    -- Apply traction loss and braking adjustments to the player's vehicle during snow
+    local vehicle = GetVehiclePedIsIn(PlayerPedId(), false)
+    if vehicle then
+        local handlingType = enable and 0.7 or 1.0
+        SetVehicleHandlingField(vehicle, "fTractionLoss", handlingType)  -- Traction loss
     end
 end
 
