@@ -10,11 +10,9 @@ Citizen.CreateThread(function()
         Citizen.Wait(1000)
         
         -- Check the current weather using the correct function
-        local weather = GetWeatherTypeTransition()
+        local weather = GetWeatherType()
 
         -- Adjust traffic density based on time of day (rush hour)
-        timeOfDay = GetClockHours()
-        
         if timeOfDay >= 7 and timeOfDay <= 9 or timeOfDay >= 16 and timeOfDay <= 18 then
             trafficDensity = 0.8 -- Rush hour traffic is higher
         else
@@ -22,13 +20,13 @@ Citizen.CreateThread(function()
         end
         
         -- Adjust traffic density based on weather
-        if weather == 'RAIN' then
+        if weather == "RAIN" then
             isRaining = true
             trafficDensity = trafficDensity + 0.3 -- More cars on the road in the rain
-        elseif weather == 'SNOW' then
+        elseif weather == "SNOW" then
             isSnowing = true
             trafficDensity = trafficDensity - 0.2 -- Snow causes some cars to stay home
-        elseif weather == 'FOG' then
+        elseif weather == "FOG" then
             isFoggy = true
             trafficDensity = trafficDensity - 0.1 -- Fewer cars in foggy conditions
         else
@@ -37,7 +35,7 @@ Citizen.CreateThread(function()
             isFoggy = false
         end
 
-        -- Apply weather-related driving effects only to NPCs
+        -- Apply weather-related driving effects for NPCs
         if isRaining then
             -- Modify NPC handling for wet roads
             ModifyNPCVehicleHandlingForRain(true)
@@ -48,13 +46,16 @@ Citizen.CreateThread(function()
             ModifyPlayerVehicleHandlingForSnow(true)
         elseif isFoggy then
             -- Reduce visibility effects (you can add fog behavior here)
-            SetVehicleHandlingField("visibility", 0.5)
+            ModifyNPCVehicleHandlingForFog(true)
+            ModifyPlayerVehicleHandlingForFog(true)
         else
             -- Reset normal conditions
             ModifyNPCVehicleHandlingForRain(false)
             ModifyNPCVehicleHandlingForSnow(false)
+            ModifyNPCVehicleHandlingForFog(false)
             ModifyPlayerVehicleHandlingForRain(false)
             ModifyPlayerVehicleHandlingForSnow(false)
+            ModifyPlayerVehicleHandlingForFog(false)
         end
 
         -- Adjust traffic spawn rate and behavior based on density
@@ -79,6 +80,7 @@ function AdjustTraffic(density)
                     -- Adjust NPC speed and handling based on weather conditions
                     AdjustNPCSpeed(car)
                     ModifyNPCVehicleHandlingForRain(true)
+                    ModifyNPCVehicleHandlingForSnow(true)
                 end
             end
         end
@@ -153,6 +155,23 @@ function ModifyNPCVehicleHandlingForSnow(enable)
     end
 end
 
+function ModifyNPCVehicleHandlingForFog(enable)
+    -- Modifies handling for foggy conditions (NPCs slow down due to low visibility)
+    local handlingType = enable and 0.5 or 1.0
+    local vehicles = GetNearbyVehicles(GetEntityCoords(PlayerPedId()), 100.0) -- Get all nearby vehicles
+    for _, vehicle in ipairs(vehicles) do
+        -- Skip player's own vehicle
+        if vehicle == GetVehiclePedIsIn(PlayerPedId(), false) then
+            goto continue
+        end
+        
+        -- Adjust braking distance and speed due to limited visibility
+        SetVehicleHandlingField(vehicle, "fBraking", handlingType)  -- Braking distance
+        SetVehicleHandlingField(vehicle, "fMaxSpeed", 30.0)  -- Reduce NPC max speed in fog
+        ::continue::
+    end
+end
+
 function ModifyPlayerVehicleHandlingForRain(enable)
     -- Apply traction loss and braking adjustments to the player's vehicle during rain
     local vehicle = GetVehiclePedIsIn(PlayerPedId(), false)
@@ -172,19 +191,19 @@ function ModifyPlayerVehicleHandlingForSnow(enable)
     end
 end
 
+function ModifyPlayerVehicleHandlingForFog(enable)
+    -- Apply cautious driving effects to the player's vehicle during fog
+    local vehicle = GetVehiclePedIsIn(PlayerPedId(), false)
+    if vehicle then
+        local handlingType = enable and 0.5 or 1.0
+        SetVehicleHandlingField(vehicle, "fBraking", handlingType)  -- Longer braking distance
+    end
+end
+
 function GetNearbyVehicles(position, radius)
     local vehicles = {}
     local handle, vehicle = FindFirstVehicle()
     local success
 
     repeat
-        local carPos = GetEntityCoords(vehicle)
-        if Vdist(position.x, position.y, position.z, carPos.x, carPos.y, carPos.z) < radius then
-            table.insert(vehicles, vehicle)
-        end
-        success, vehicle = FindNextVehicle(handle)
-    until not success
-
-    EndFindVehicle(handle)
-    return vehicles
-end
+        local carPos = GetEntityCoords
